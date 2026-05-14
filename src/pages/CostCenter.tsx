@@ -196,15 +196,16 @@ const CostCenter = () => {
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .cost-center-page { padding-bottom: 120px; } /* Espaço para o menu mobile */
+        .cost-center-page { padding-bottom: 120px; width: 100%; max-width: 100%; overflow-x: hidden; }
         
-        .page-header { margin-bottom: 2.5rem; }
+        .page-header { margin-bottom: 2.5rem; padding: 0 0.5rem; }
         
-        .filters-card { padding: 1.5rem; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.05); }
-        .filters-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+        .filters-card { padding: 1.25rem; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.05); width: 100%; }
+        .filters-grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; width: 100%; }
         @media (min-width: 1024px) { .filters-grid { grid-template-columns: 1fr 1fr 1fr 1fr; } }
         
-        .filter-group { display: flex; flex-direction: column; gap: 0.75rem; }
+        .filter-group { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+        .filter-group input, .filter-group select { width: 100%; max-width: 100%; }
         .filter-group label { display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-sm); color: var(--text-muted); font-weight: 500; }
         
         .stats-grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
