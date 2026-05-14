@@ -166,6 +166,13 @@ const Layout = ({ onLogout }: LayoutProps) => {
         .main-content {
           flex-grow: 1;
           width: 100%;
+          min-width: 0;
+        }
+        
+        @media (min-width: 1024px) {
+          .main-content {
+            padding-left: 260px;
+          }
         }
 
         .bottom-nav {
