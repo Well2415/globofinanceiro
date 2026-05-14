@@ -7,6 +7,7 @@ import Entries from './pages/Entries';
 import Expenses from './pages/Expenses';
 import Settings from './pages/Settings';
 import CostCenter from './pages/CostCenter';
+import ScrollToTop from './components/ScrollToTop';
 import { seedData } from './utils/seed';
 import './index.css';
 
@@ -25,6 +26,7 @@ function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <Routes>
         <Route 
           path="/login" 
