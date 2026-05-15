@@ -24,7 +24,7 @@ const Login = ({ onLogin }: LoginProps) => {
         .select('*')
         .eq('username', normalizedUsername)
         .eq('password', password)
-        .single();
+        .maybeSingle();
 
       if (dbError || !data) {
         setError('Usuário ou senha incorretos.');
