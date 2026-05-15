@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { Entry, Expense, Routine } from '../types';
 import { Calendar, Filter, TrendingUp, TrendingDown, DollarSign, List } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const CostCenter = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Filters
   const [startDate, setStartDate] = useState(() => {
@@ -18,14 +20,27 @@ const CostCenter = () => {
   const [filterClient, setFilterClient] = useState('');
 
   useEffect(() => {
-    const savedEntries = JSON.parse(localStorage.getItem('globo_entries') || '[]');
-    const savedExpenses = JSON.parse(localStorage.getItem('globo_expenses') || '[]');
-    const savedRoutines = JSON.parse(localStorage.getItem('globo_routines') || '[]');
-    
-    setEntries(savedEntries);
-    setExpenses(savedExpenses);
-    setRoutines(savedRoutines);
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [entriesRes, expensesRes, routinesRes] = await Promise.all([
+        supabase.from('entries').select('*').order('date', { ascending: false }),
+        supabase.from('expenses').select('*').order('date', { ascending: false }),
+        supabase.from('routines').select('*').order('name', { ascending: true })
+      ]);
+
+      if (entriesRes.data) setEntries(entriesRes.data);
+      if (expensesRes.data) setExpenses(expensesRes.data);
+      if (routinesRes.data) setRoutines(routinesRes.data);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filter logic
   const filteredEntries = entries.filter(e => {
@@ -37,8 +52,6 @@ const CostCenter = () => {
   const filteredExpenses = expenses.filter(e => {
     const dateMatch = e.date >= startDate && e.date <= endDate;
     const itemMatch = filterItem === 'Todos' || e.name === filterItem;
-    // Se estiver filtrando por cliente, despesas ficam zeradas para bater a somatória daquele cliente
-    // A menos que o campo cliente esteja vazio
     const hideExpenses = filterClient.length > 0;
     return dateMatch && itemMatch && !hideExpenses;
   });
@@ -47,7 +60,6 @@ const CostCenter = () => {
   const totalExpenses = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0);
   const balance = totalEntries - totalExpenses;
 
-  // Breakdown by item
   const breakdown = filteredExpenses.reduce((acc: any, curr) => {
     acc[curr.name] = (acc[curr.name] || 0) + curr.value;
     return acc;
@@ -56,6 +68,8 @@ const CostCenter = () => {
   const formatCurrency = (val: number) => {
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
+
+  if (loading) return <div className="p-8 text-center">Carregando centro de custo...</div>;
 
   return (
     <div className="cost-center-page animate-fade-in">
@@ -125,7 +139,6 @@ const CostCenter = () => {
 
       {/* Breakdown and Details */}
       <div className="details-grid">
-        {/* Breakdown by Item */}
         <section className="card glass-card">
           <div className="card-header">
             <List size={18} />
@@ -158,14 +171,12 @@ const CostCenter = () => {
           </div>
         </section>
 
-        {/* Combined Transaction History (Filtered) */}
         <section className="card glass-card">
           <div className="card-header">
             <Filter size={18} />
             <h3>Histórico Filtrado</h3>
           </div>
           <div className="mini-list">
-            {/* Show only expenses if filterItem is not "Todos" */}
             {filterItem !== 'Todos' ? (
               filteredExpenses.map(ex => (
                 <div key={ex.id} className="mini-item">
@@ -196,84 +207,38 @@ const CostCenter = () => {
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .cost-center-page { 
-          padding-bottom: 120px; 
-          width: 100%; 
-          max-width: 100%; 
-          overflow-x: hidden;
-          display: block;
-        }
-        
+        .cost-center-page { padding-bottom: 120px; width: 100%; max-width: 100%; overflow-x: hidden; display: block; }
         .page-header { margin-bottom: 2rem; padding: 0 0.25rem; }
-        
-        .filters-card { 
-          padding: 1rem; 
-          margin-bottom: 2rem; 
-          border: 1px solid rgba(255,255,255,0.05); 
-          width: 100%;
-          overflow: hidden; /* Corta qualquer escape */
-        }
-        
-        .filters-grid { 
-          display: flex; 
-          flex-direction: column; 
-          gap: 1.25rem; 
-          width: 100%; 
-        }
-        
-        @media (min-width: 1024px) { 
-          .filters-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr 1fr 1fr; 
-          } 
-        }
-        
-        .filter-group { 
-          display: flex; 
-          flex-direction: column; 
-          gap: 0.5rem; 
-          width: 100%; 
-          min-width: 0; /* Evita que o flex force largura mínima */
-        }
-        
-        .filter-group input, .filter-group select { 
-          width: 100% !important; 
-          display: block;
-          box-sizing: border-box !important;
-        }
-        .filter-group label { display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-sm); color: var(--text-muted); font-weight: 500; }
-        
+        .filters-card { padding: 1rem; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.05); width: 100%; overflow: hidden; }
+        .filters-grid { display: flex; flex-direction: column; gap: 1.25rem; width: 100%; }
+        @media (min-width: 1024px) { .filters-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; } }
+        .filter-group { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; min-width: 0; }
+        .filter-group input, .filter-group select { width: 100% !important; display: block; box-sizing: border-box !important; }
+        .filter-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
         .stats-grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
         @media (min-width: 768px) { .stats-grid { grid-template-columns: 1fr 1fr 1fr; } }
-        
         .stat-card { padding: 1.75rem 1.5rem; }
         .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
-        .stat-label { font-size: var(--font-sm); color: var(--text-muted); font-weight: 500; }
-        .stat-value { font-size: var(--font-lg); font-weight: 800; letter-spacing: -0.02em; }
-        
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+        .stat-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
         .details-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
         @media (min-width: 1024px) { .details-grid { grid-template-columns: 1fr 1fr; gap: 3rem; } }
-        
         .card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
         .card-header h3 { font-size: 1.1rem; }
-        
         .breakdown-list { display: flex; flex-direction: column; gap: 1.5rem; }
         .breakdown-item { display: flex; flex-direction: column; gap: 0.5rem; }
         .breakdown-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
         .breakdown-name { font-weight: 600; }
         .breakdown-percent { color: var(--text-muted); font-size: 0.8rem; }
-        
         .breakdown-bar-bg { height: 8px; background: var(--bg-card-hover); border-radius: 4px; overflow: hidden; }
         .breakdown-bar-fill { height: 100%; background: var(--primary); border-radius: 4px; }
         .breakdown-val { font-weight: 700; align-self: flex-end; font-size: 0.9rem; }
-        
         .mini-list { display: flex; flex-direction: column; gap: 0.75rem; }
         .mini-item { display: flex; justify-content: space-between; padding: 0.5rem 0.75rem; background: var(--bg-card-hover); border-radius: var(--radius-sm); font-size: 0.9rem; }
         .mini-section-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 1rem; margin-bottom: 0.25rem; }
-        
-        .text-success { color: var(--success); }
-        .text-danger { color: var(--danger); }
-        .text-primary { color: var(--primary); }
+        .text-success { color: #10b981; }
+        .text-danger { color: #ef4444; }
+        .text-primary { color: #3b82f6; }
         .empty-text { color: var(--text-muted); text-align: center; padding: 2rem; font-size: 0.9rem; }
       `}} />
     </div>
