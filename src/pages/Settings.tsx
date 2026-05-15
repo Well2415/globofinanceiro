@@ -42,7 +42,7 @@ const Settings = () => {
   const addMethod = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName) return;
-    const { data, error } = await supabase.from('payment_methods').insert([{ name: newName }]).select().single();
+    const { data } = await supabase.from('payment_methods').insert([{ name: newName }]).select().single();
     if (data) {
       setMethods([...methods, data]);
       setNewName('');
@@ -52,7 +52,7 @@ const Settings = () => {
   const addRoutine = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!routineName) return;
-    const { data, error } = await supabase.from('routines').insert([{ name: routineName }]).select().single();
+    const { data } = await supabase.from('routines').insert([{ name: routineName }]).select().single();
     if (data) {
       setRoutines([...routines, data]);
       setRoutineName('');
@@ -63,7 +63,7 @@ const Settings = () => {
     e.preventDefault();
     if (!userName || !userLogin || !userPass) return;
     const normalizedLogin = userLogin.toLowerCase().trim();
-    const { data, error } = await supabase.from('users').insert([{ 
+    const { data } = await supabase.from('users').insert([{ 
       name: userName, 
       username: normalizedLogin, 
       password: userPass 

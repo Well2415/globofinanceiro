@@ -3,7 +3,8 @@ export interface Entry {
   client: string;
   description: string;
   date: string;
-  paymentMethod: string;
+  paymentMethod?: string;
+  payment_method?: string;
   value: number;
 }
 
