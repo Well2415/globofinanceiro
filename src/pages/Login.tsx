@@ -71,6 +71,7 @@ const Login = ({ onLogin }: LoginProps) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
             />
           </div>
           
@@ -80,10 +81,6 @@ const Login = ({ onLogin }: LoginProps) => {
             <LogIn size={20} />
             {loading ? 'Acessando...' : 'Entrar no Sistema'}
           </button>
-
-          <div className="login-hint">
-            <p>Acesso padrão: <strong>admin</strong> / <strong>1234</strong></p>
-          </div>
         </form>
       </div>
 
