@@ -24,6 +24,13 @@ export interface Routine {
   name: string;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  username: string;
+  password?: string;
+}
+
 export interface FinancialSummary {
   totalEntries: number;
   totalExpenses: number;

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import type { Entry, PaymentMethod } from '../types';
 import { Plus, Trash2, Calendar, User, CreditCard, DollarSign, FileText } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const Entries = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const [client, setClient] = useState('');
   const [description, setDescription] = useState('');
@@ -13,56 +15,88 @@ const Entries = () => {
   const [value, setValue] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-    const savedEntries = JSON.parse(localStorage.getItem('globo_entries') || '[]');
-    setEntries(savedEntries);
-
-    const savedMethods = JSON.parse(localStorage.getItem('globo_payment_methods') || '[]');
-    if (savedMethods.length > 0) {
-      setPaymentMethods(savedMethods);
-      setPaymentMethod(savedMethods[0].name);
-    } else {
-      const initial = [
-        { id: '1', name: 'Pix' },
-        { id: '2', name: 'Cartão de Crédito' },
-        { id: '3', name: 'Cartão de Débito' },
-        { id: '4', name: 'Dinheiro' }
-      ];
-      setPaymentMethods(initial);
-      setPaymentMethod('Pix');
-    }
+    fetchData();
   }, []);
 
-  const saveEntries = (newEntries: Entry[]) => {
-    setEntries(newEntries);
-    localStorage.setItem('globo_entries', JSON.stringify(newEntries));
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [entriesRes, methodsRes] = await Promise.all([
+        supabase.from('entries').select('*').order('date', { ascending: false }),
+        supabase.from('payment_methods').select('*').order('name', { ascending: true })
+      ]);
+
+      if (entriesRes.data) setEntries(entriesRes.data);
+      if (methodsRes.data) {
+        setPaymentMethods(methodsRes.data);
+        if (methodsRes.data.length > 0) setPaymentMethod(methodsRes.data[0].name);
+      }
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!client || !value || !paymentMethod) return;
+    setSubmitting(true);
 
-    const newEntry: Entry = {
-      id: Date.now().toString(),
-      client,
-      description: description || 'Venda',
-      date,
-      paymentMethod,
-      value: parseFloat(value),
-    };
+    try {
+      const newEntry = {
+        client,
+        description: description || 'Venda',
+        date,
+        payment_method: paymentMethod,
+        value: parseFloat(value),
+      };
 
-    saveEntries([newEntry, ...entries]);
-    setClient('');
-    setDescription('');
-    setValue('');
-    setShowForm(false);
+      const { data, error } = await supabase
+        .from('entries')
+        .insert([newEntry])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setEntries([data, ...entries]);
+      setClient('');
+      setDescription('');
+      setValue('');
+      setShowForm(false);
+    } catch (err) {
+      console.error('Error saving entry:', err);
+      alert('Erro ao salvar entrada.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const deleteEntry = (id: string) => {
-    saveEntries(entries.filter(e => e.id !== id));
+  const deleteEntry = async (id: string) => {
+    if (!confirm('Deseja realmente excluir esta entrada?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('entries')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setEntries(entries.filter(e => e.id !== id));
+    } catch (err) {
+      console.error('Error deleting entry:', err);
+      alert('Erro ao excluir entrada.');
+    }
   };
+
+  if (loading) {
+    return <div className="p-8 text-center">Carregando entradas...</div>;
+  }
 
   return (
     <div className="page-container animate-fade-in">
@@ -130,7 +164,9 @@ const Entries = () => {
                 />
               </div>
             </div>
-            <button type="submit" className="btn-primary submit-btn">Salvar Entrada</button>
+            <button type="submit" className="btn-primary submit-btn" disabled={submitting}>
+              {submitting ? 'Salvando...' : 'Salvar Entrada'}
+            </button>
           </form>
         </div>
       )}
@@ -147,7 +183,7 @@ const Entries = () => {
                 <div className="item-main">
                   <div className="item-title-row">
                     <h3 className="client-name">{entry.client}</h3>
-                    <span className="method-badge">{entry.paymentMethod}</span>
+                    <span className="payment-badge">{entry.payment_method || entry.paymentMethod}</span>
                   </div>
                   <p className="item-desc">{entry.description}</p>
                   <span className="item-date">{new Date(entry.date).toLocaleDateString('pt-BR')}</span>
@@ -205,7 +241,7 @@ const Entries = () => {
           min-width: 0;
         }
 
-        .item-header-row {
+        .item-title-row {
           display: flex;
           align-items: center;
           gap: 0.75rem;

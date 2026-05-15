@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ArrowUpCircle, ArrowDownCircle, LogOut, Settings as SettingsIcon, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, ArrowUpCircle, ArrowDownCircle, LogOut, Settings as SettingsIcon, BarChart3, ShieldCheck } from 'lucide-react';
 
 
 interface LayoutProps {
@@ -40,6 +40,10 @@ const Layout = ({ onLogout }: LayoutProps) => {
             <BarChart3 size={20} />
             <span>Centro de Custo</span>
           </NavLink>
+          <NavLink to="/security" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <ShieldCheck size={20} />
+            <span>Acesso</span>
+          </NavLink>
           <NavLink to="/settings" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <SettingsIcon size={20} />
             <span>Ajustes</span>
@@ -76,6 +80,10 @@ const Layout = ({ onLogout }: LayoutProps) => {
         <NavLink to="/cost-center" className={({ isActive }) => isActive ? 'mobile-nav-item active' : 'mobile-nav-item'}>
           <BarChart3 size={24} />
           <span>Relatórios</span>
+        </NavLink>
+        <NavLink to="/security" className={({ isActive }) => isActive ? 'mobile-nav-item active' : 'mobile-nav-item'}>
+          <ShieldCheck size={24} />
+          <span>Acesso</span>
         </NavLink>
         <NavLink to="/settings" className={({ isActive }) => isActive ? 'mobile-nav-item active' : 'mobile-nav-item'}>
           <SettingsIcon size={24} />

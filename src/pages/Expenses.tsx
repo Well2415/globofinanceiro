@@ -1,65 +1,98 @@
 import { useState, useEffect } from 'react';
 import type { Expense, Routine } from '../types';
 import { Plus, Trash2, Calendar, DollarSign, Zap } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const Expenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const [name, setName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [value, setValue] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-    let saved = JSON.parse(localStorage.getItem('globo_expenses') || '[]');
-    // Migração de dados antigos
-    if (saved.length > 0) {
-      saved = saved.map((e: any) => ({
-        ...e,
-        name: e.name || e.description || 'Despesa'
-      }));
-    }
-    setExpenses(saved);
-
-    const savedRoutines = JSON.parse(localStorage.getItem('globo_routines') || '[]');
-    setRoutines(savedRoutines);
+    fetchData();
   }, []);
 
-  const saveExpenses = (newExpenses: Expense[]) => {
-    setExpenses(newExpenses);
-    localStorage.setItem('globo_expenses', JSON.stringify(newExpenses));
-  };
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [expensesRes, routinesRes] = await Promise.all([
+        supabase.from('expenses').select('*').order('date', { ascending: false }),
+        supabase.from('routines').select('*').order('name', { ascending: true })
+      ]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!value || !name) return;
-
-    const newExpense: Expense = {
-      id: Date.now().toString(),
-      name,
-      date,
-      value: parseFloat(value),
-    };
-
-    saveExpenses([newExpense, ...expenses]);
-    setName('');
-    setValue('');
-    setShowForm(false);
-  };
-
-  const handleRoutineSelect = (id: string) => {
-    const routine = routines.find(r => r.id === id);
-    if (routine) {
-      setName(routine.name);
+      if (expensesRes.data) setExpenses(expensesRes.data);
+      if (routinesRes.data) setRoutines(routinesRes.data);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const deleteExpense = (id: string) => {
-    saveExpenses(expenses.filter(e => e.id !== id));
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!value || !name) return;
+    setSubmitting(true);
+
+    try {
+      const newExpense = {
+        name,
+        date,
+        value: parseFloat(value),
+      };
+
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert([newExpense])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setExpenses([data, ...expenses]);
+      setName('');
+      setValue('');
+      setShowForm(false);
+    } catch (err) {
+      console.error('Error saving expense:', err);
+      alert('Erro ao salvar despesa.');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const handleRoutineSelect = (val: string) => {
+    setName(val);
+  };
+
+  const deleteExpense = async (id: string) => {
+    if (!confirm('Deseja realmente excluir esta despesa?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setExpenses(expenses.filter(e => e.id !== id));
+    } catch (err) {
+      console.error('Error deleting expense:', err);
+      alert('Erro ao excluir despesa.');
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8 text-center">Carregando saídas...</div>;
+  }
 
   return (
     <div className="page-container animate-fade-in">
@@ -81,13 +114,23 @@ const Expenses = () => {
             <select onChange={(e) => handleRoutineSelect(e.target.value)} defaultValue="">
               <option value="" disabled>Escolha um item (Ex: Energia, Lanche...)</option>
               {routines.map(r => (
-                <option key={r.id} value={r.id}>{r.name}</option>
+                <option key={r.id} value={r.name}>{r.name}</option>
               ))}
             </select>
           </div>
 
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
+              <div className="input-group">
+                <label>Descrição / Nome</label>
+                <input 
+                  type="text" 
+                  placeholder="Ex: Almoço" 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  required 
+                />
+              </div>
               <div className="input-group">
                 <label><Calendar size={14} /> Data</label>
                 <input 
@@ -109,7 +152,9 @@ const Expenses = () => {
                 />
               </div>
             </div>
-            <button type="submit" className="btn-primary submit-btn">Confirmar Saída</button>
+            <button type="submit" className="btn-primary submit-btn" disabled={submitting}>
+              {submitting ? 'Confirmando...' : 'Confirmar Saída'}
+            </button>
           </form>
         </div>
       )}

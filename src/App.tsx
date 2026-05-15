@@ -7,15 +7,11 @@ import Entries from './pages/Entries';
 import Expenses from './pages/Expenses';
 import Settings from './pages/Settings';
 import CostCenter from './pages/CostCenter';
+import Security from './pages/Security';
 import ScrollToTop from './components/ScrollToTop';
-import { seedData } from './utils/seed';
 import './index.css';
 
 function App() {
-  useEffect(() => {
-    seedData();
-  }, []);
-
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('globo_auth') === 'true';
   });
@@ -42,6 +38,7 @@ function App() {
           <Route path="expenses" element={<Expenses />} />
           <Route path="settings" element={<Settings />} />
           <Route path="cost-center" element={<CostCenter />} />
+          <Route path="security" element={<Security />} />
         </Route>
       </Routes>
     </Router>

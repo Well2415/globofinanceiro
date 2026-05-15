@@ -2,17 +2,33 @@ import { useState, useEffect } from 'react';
 import type { Entry, Expense } from '../types';
 import { TrendingUp, TrendingDown, Wallet, PlusCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const Dashboard = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedEntries = JSON.parse(localStorage.getItem('globo_entries') || '[]');
-    const savedExpenses = JSON.parse(localStorage.getItem('globo_expenses') || '[]');
-    setEntries(savedEntries);
-    setExpenses(savedExpenses);
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [entriesRes, expensesRes] = await Promise.all([
+        supabase.from('entries').select('*').order('date', { ascending: false }),
+        supabase.from('expenses').select('*').order('date', { ascending: false })
+      ]);
+
+      if (entriesRes.data) setEntries(entriesRes.data);
+      if (expensesRes.data) setExpenses(expensesRes.data);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalEntries = entries.reduce((acc, curr) => acc + curr.value, 0);
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.value, 0);
@@ -21,6 +37,10 @@ const Dashboard = () => {
   const formatCurrency = (val: number) => {
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
+
+  if (loading) {
+    return <div className="p-8 text-center">Carregando dados financeiros...</div>;
+  }
 
   return (
     <div className="dashboard-page animate-fade-in">
