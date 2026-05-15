@@ -96,6 +96,7 @@ const Security = () => {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Sua senha atual"
                 required
+                autoComplete="current-password"
               />
             </div>
 
@@ -107,6 +108,7 @@ const Security = () => {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Mínimo 3 caracteres"
                 required
+                autoComplete="new-password"
               />
             </div>
 
@@ -118,6 +120,7 @@ const Security = () => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repita a nova senha"
                 required
+                autoComplete="new-password"
               />
             </div>
 
