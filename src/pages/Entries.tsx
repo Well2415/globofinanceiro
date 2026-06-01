@@ -33,7 +33,7 @@ const Entries = () => {
       if (entriesRes.data) setEntries(entriesRes.data);
       if (methodsRes.data) {
         setPaymentMethods(methodsRes.data);
-        if (methodsRes.data.length > 0) setPaymentMethod(methodsRes.data[0].name);
+        if (methodsRes.data.length > 0) setPaymentMethod('');
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -56,6 +56,18 @@ const Entries = () => {
         value: parseFloat(value),
       };
 
+      const methodExists = paymentMethods.some(m => m.name.toLowerCase() === paymentMethod.toLowerCase());
+      if (!methodExists) {
+        const { data: newMethod, error: methodError } = await supabase
+          .from('payment_methods')
+          .insert([{ name: paymentMethod }])
+          .select()
+          .single();
+        if (!methodError && newMethod) {
+          setPaymentMethods([...paymentMethods, newMethod]);
+        }
+      }
+
       const { data, error } = await supabase
         .from('entries')
         .insert([newEntry])
@@ -68,6 +80,7 @@ const Entries = () => {
       setClient('');
       setDescription('');
       setValue('');
+      setPaymentMethod('');
       setShowForm(false);
     } catch (err) {
       console.error('Error saving entry:', err);
@@ -146,11 +159,19 @@ const Entries = () => {
               </div>
               <div className="input-group">
                 <label><CreditCard size={14} /> Forma de Pagamento</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                <input 
+                  type="text" 
+                  list="payment-methods"
+                  placeholder="Selecione ou digite"
+                  value={paymentMethod} 
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  required 
+                />
+                <datalist id="payment-methods">
                   {paymentMethods.map(m => (
-                    <option key={m.id} value={m.name}>{m.name}</option>
+                    <option key={m.id} value={m.name} />
                   ))}
-                </select>
+                </datalist>
               </div>
               <div className="input-group">
                 <label><DollarSign size={14} /> Valor (R$)</label>
