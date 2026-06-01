@@ -16,6 +16,7 @@ const Entries = () => {
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [isCustomPayment, setIsCustomPayment] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -81,6 +82,7 @@ const Entries = () => {
       setDescription('');
       setValue('');
       setPaymentMethod('');
+      setIsCustomPayment(false);
       setShowForm(false);
     } catch (err) {
       console.error('Error saving entry:', err);
@@ -159,19 +161,46 @@ const Entries = () => {
               </div>
               <div className="input-group">
                 <label><CreditCard size={14} /> Forma de Pagamento</label>
-                <input 
-                  type="text" 
-                  list="payment-methods"
-                  placeholder="Selecione ou digite"
-                  value={paymentMethod} 
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  required 
-                />
-                <datalist id="payment-methods">
-                  {paymentMethods.map(m => (
-                    <option key={m.id} value={m.name} />
-                  ))}
-                </datalist>
+                {!isCustomPayment ? (
+                  <select 
+                    value={paymentMethod} 
+                    onChange={(e) => {
+                      if (e.target.value === 'custom') {
+                        setIsCustomPayment(true);
+                        setPaymentMethod('');
+                      } else {
+                        setPaymentMethod(e.target.value);
+                      }
+                    }}
+                    required
+                  >
+                    <option value="" disabled>Selecione...</option>
+                    {paymentMethods.map(m => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                    <option value="custom">+ Adicionar nova forma...</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input 
+                      type="text" 
+                      placeholder="Digite a nova forma..." 
+                      value={paymentMethod} 
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      required 
+                      autoFocus
+                      style={{ flex: 1 }}
+                    />
+                    <button 
+                      type="button" 
+                      style={{ padding: '0 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)', cursor: 'pointer' }} 
+                      onClick={() => { setIsCustomPayment(false); setPaymentMethod(''); }}
+                      title="Voltar para a lista"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="input-group">
                 <label><DollarSign size={14} /> Valor (R$)</label>
