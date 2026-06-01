@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
-import type { Expense, Routine } from '../types';
-import { Plus, Trash2, Calendar, DollarSign, Zap } from 'lucide-react';
+import type { Expense, Routine, PaymentMethod } from '../types';
+import { Plus, Trash2, Calendar, DollarSign, Zap, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const Expenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [name, setName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [value, setValue] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [isCustomPayment, setIsCustomPayment] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -23,13 +26,18 @@ const Expenses = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [expensesRes, routinesRes] = await Promise.all([
+      const [expensesRes, routinesRes, methodsRes] = await Promise.all([
         supabase.from('expenses').select('*').order('date', { ascending: false }),
-        supabase.from('routines').select('*').order('name', { ascending: true })
+        supabase.from('routines').select('*').order('name', { ascending: true }),
+        supabase.from('payment_methods').select('*').order('name', { ascending: true })
       ]);
 
       if (expensesRes.data) setExpenses(expensesRes.data);
       if (routinesRes.data) setRoutines(routinesRes.data);
+      if (methodsRes.data) {
+        setPaymentMethods(methodsRes.data);
+        if (methodsRes.data.length > 0) setPaymentMethod('');
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -39,13 +47,26 @@ const Expenses = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!value || !name) return;
+    if (!value || !name || !paymentMethod) return;
     setSubmitting(true);
 
     try {
+      const methodExists = paymentMethods.some(m => m.name.toLowerCase() === paymentMethod.toLowerCase());
+      if (!methodExists) {
+        const { data: newMethod, error: methodError } = await supabase
+          .from('payment_methods')
+          .insert([{ name: paymentMethod }])
+          .select()
+          .single();
+        if (!methodError && newMethod) {
+          setPaymentMethods([...paymentMethods, newMethod]);
+        }
+      }
+
       const newExpense = {
         name,
         date,
+        payment_method: paymentMethod,
         value: parseFloat(value),
       };
 
@@ -60,6 +81,8 @@ const Expenses = () => {
       setExpenses([data, ...expenses]);
       setName('');
       setValue('');
+      setPaymentMethod('');
+      setIsCustomPayment(false);
       setShowForm(false);
     } catch (err) {
       console.error('Error saving expense:', err);
@@ -141,6 +164,49 @@ const Expenses = () => {
                 />
               </div>
               <div className="input-group">
+                <label><CreditCard size={14} /> Forma de Pagamento</label>
+                {!isCustomPayment ? (
+                  <select 
+                    value={paymentMethod} 
+                    onChange={(e) => {
+                      if (e.target.value === 'custom') {
+                        setIsCustomPayment(true);
+                        setPaymentMethod('');
+                      } else {
+                        setPaymentMethod(e.target.value);
+                      }
+                    }}
+                    required
+                  >
+                    <option value="" disabled>Selecione...</option>
+                    {paymentMethods.map(m => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                    <option value="custom">+ Adicionar nova forma...</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input 
+                      type="text" 
+                      placeholder="Digite a nova forma..." 
+                      value={paymentMethod} 
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      required 
+                      autoFocus
+                      style={{ flex: 1 }}
+                    />
+                    <button 
+                      type="button" 
+                      style={{ padding: '0 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)', cursor: 'pointer' }} 
+                      onClick={() => { setIsCustomPayment(false); setPaymentMethod(''); }}
+                      title="Voltar para a lista"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="input-group">
                 <label><DollarSign size={14} /> Valor (R$)</label>
                 <input 
                   type="number" 
@@ -169,7 +235,12 @@ const Expenses = () => {
             {expenses.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(expense => (
               <div key={expense.id} className="item-card glass-card">
                 <div className="item-main">
-                  <h3 className="expense-desc">{expense.name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
+                    <h3 className="expense-desc">{expense.name}</h3>
+                    {(expense.payment_method || expense.paymentMethod) && (
+                      <span className="payment-badge">{expense.payment_method || expense.paymentMethod}</span>
+                    )}
+                  </div>
                   <span className="item-date">{new Date(expense.date).toLocaleDateString('pt-BR')}</span>
                 </div>
                 <div className="item-details">
@@ -228,6 +299,15 @@ const Expenses = () => {
           word-break: break-word;
           white-space: pre-wrap;
           color: var(--text-main);
+        }
+
+        .payment-badge {
+          font-size: 0.65rem;
+          padding: 0.15rem 0.4rem;
+          background-color: var(--bg-card-hover);
+          border-radius: 4px;
+          color: var(--primary-light);
+          font-weight: 600;
         }
 
         .expense-val {

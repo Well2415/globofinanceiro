@@ -17,6 +17,8 @@ export interface Expense {
   id: string;
   name: string;
   date: string;
+  paymentMethod?: string;
+  payment_method?: string;
   value: number;
 }
 
