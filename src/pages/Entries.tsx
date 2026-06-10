@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Entry, PaymentMethod } from '../types';
-import { Plus, Trash2, Calendar, User, CreditCard, DollarSign, FileText } from 'lucide-react';
+import { Plus, Trash2, Calendar, User, CreditCard, DollarSign, FileText, Pencil, X, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const Entries = () => {
@@ -17,6 +17,17 @@ const Entries = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [isCustomPayment, setIsCustomPayment] = useState(false);
+
+  // Edit state
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const [editClient, setEditClient] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editPaymentMethod, setEditPaymentMethod] = useState('');
+  const [editValue, setEditValue] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [isEditCustomPayment, setIsEditCustomPayment] = useState(false);
+
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -106,6 +117,66 @@ const Entries = () => {
     } catch (err) {
       console.error('Error deleting entry:', err);
       alert('Erro ao excluir entrada.');
+    }
+  };
+
+  const openEditModal = (entry: Entry) => {
+    setEditingEntry(entry);
+    setEditClient(entry.client);
+    setEditDescription(entry.description);
+    setEditDate(entry.date);
+    setEditPaymentMethod(entry.payment_method || entry.paymentMethod || '');
+    setEditValue(String(entry.value));
+    setIsEditCustomPayment(false);
+  };
+
+  const closeEditModal = () => {
+    setEditingEntry(null);
+    setIsEditCustomPayment(false);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEntry || !editClient || !editValue || !editPaymentMethod) return;
+    setEditSubmitting(true);
+
+    try {
+      const methodExists = paymentMethods.some(m => m.name.toLowerCase() === editPaymentMethod.toLowerCase());
+      if (!methodExists) {
+        const { data: newMethod, error: methodError } = await supabase
+          .from('payment_methods')
+          .insert([{ name: editPaymentMethod }])
+          .select()
+          .single();
+        if (!methodError && newMethod) {
+          setPaymentMethods([...paymentMethods, newMethod]);
+        }
+      }
+
+      const updatedData = {
+        client: editClient,
+        description: editDescription || 'Venda',
+        date: editDate,
+        payment_method: editPaymentMethod,
+        value: parseFloat(editValue),
+      };
+
+      const { error } = await supabase
+        .from('entries')
+        .update(updatedData)
+        .eq('id', editingEntry.id);
+
+      if (error) throw error;
+
+      setEntries(entries.map(e =>
+        e.id === editingEntry.id ? { ...e, ...updatedData } : e
+      ));
+      closeEditModal();
+    } catch (err) {
+      console.error('Error updating entry:', err);
+      alert('Erro ao atualizar entrada.');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -242,7 +313,10 @@ const Entries = () => {
                   <span className="item-value text-success">
                     {entry.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
-                  <button className="delete-btn" onClick={() => deleteEntry(entry.id)}>
+                  <button className="edit-btn" onClick={() => openEditModal(entry)} title="Editar entrada">
+                    <Pencil size={16} />
+                  </button>
+                  <button className="delete-btn" onClick={() => deleteEntry(entry.id)} title="Excluir entrada">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -268,6 +342,114 @@ const Entries = () => {
           </>
         )}
       </div>
+
+      {/* Modal de Edição */}
+      {editingEntry && (
+        <div className="modal-overlay" onClick={closeEditModal}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2><Pencil size={18} /> Editar Entrada</h2>
+              <button className="modal-close-btn" onClick={closeEditModal}>
+                <X size={22} />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit}>
+              <div className="modal-form-grid">
+                <div className="input-group">
+                  <label><User size={14} /> Cliente</label>
+                  <input
+                    type="text"
+                    placeholder="Nome do cliente"
+                    value={editClient}
+                    onChange={(e) => setEditClient(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label><FileText size={14} /> Descrição da Venda</label>
+                  <input
+                    type="text"
+                    placeholder="O que foi vendido?"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label><Calendar size={14} /> Data</label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label><CreditCard size={14} /> Forma de Pagamento</label>
+                  {!isEditCustomPayment ? (
+                    <select
+                      value={editPaymentMethod}
+                      onChange={(e) => {
+                        if (e.target.value === 'custom') {
+                          setIsEditCustomPayment(true);
+                          setEditPaymentMethod('');
+                        } else {
+                          setEditPaymentMethod(e.target.value);
+                        }
+                      }}
+                      required
+                    >
+                      <option value="" disabled>Selecione...</option>
+                      {paymentMethods.map(m => (
+                        <option key={m.id} value={m.name}>{m.name}</option>
+                      ))}
+                      <option value="custom">+ Adicionar nova forma...</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Digite a nova forma..."
+                        value={editPaymentMethod}
+                        onChange={(e) => setEditPaymentMethod(e.target.value)}
+                        required
+                        autoFocus
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        style={{ padding: '0 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)', cursor: 'pointer' }}
+                        onClick={() => { setIsEditCustomPayment(false); setEditPaymentMethod(''); }}
+                      >
+                        Voltar
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="input-group">
+                  <label><DollarSign size={14} /> Valor (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={closeEditModal}>
+                  <X size={16} /> Cancelar
+                </button>
+                <button type="submit" className="btn-primary btn-save" disabled={editSubmitting}>
+                  <Check size={16} /> {editSubmitting ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <style dangerouslySetInnerHTML={{ __html: `
         .page-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
@@ -313,7 +495,7 @@ const Entries = () => {
         }
         .item-date { font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; }
 
-        .item-details { display: flex; align-items: center; gap: 1rem; }
+        .item-details { display: flex; align-items: center; gap: 0.5rem; }
         .payment-badge {
           font-size: 0.65rem;
           padding: 0.15rem 0.4rem;
@@ -324,8 +506,39 @@ const Entries = () => {
         }
 
         .item-value { font-weight: 700; color: var(--success); }
-        .delete-btn { color: var(--text-muted); padding: 0.5rem; }
-        .delete-btn:hover { color: var(--danger); }
+
+        .edit-btn {
+          color: var(--text-muted);
+          padding: 0.5rem;
+          background: none;
+          border: none;
+          cursor: pointer;
+          border-radius: var(--radius-sm);
+          transition: color 0.2s, background 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 36px;
+          min-height: 36px;
+        }
+        .edit-btn:hover { color: var(--primary-light); background: rgba(99,179,237,0.1); }
+
+        .delete-btn {
+          color: var(--text-muted);
+          padding: 0.5rem;
+          background: none;
+          border: none;
+          cursor: pointer;
+          border-radius: var(--radius-sm);
+          transition: color 0.2s, background 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 36px;
+          min-height: 36px;
+        }
+        .delete-btn:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+
         .empty-state { text-align: center; padding: 3rem; color: var(--text-muted); border: 2px dashed var(--border); border-radius: var(--radius-lg); }
 
         .pagination-container {
@@ -361,6 +574,127 @@ const Entries = () => {
         .page-btn:hover:not(.active) {
           background: rgba(255, 255, 255, 0.1);
           color: var(--text-main);
+        }
+
+        /* Modal */
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.65);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+          animation: fadeInOverlay 0.2s ease;
+        }
+
+        @keyframes fadeInOverlay {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .modal-box {
+          background: var(--bg-card, #1e2535);
+          border: 1px solid var(--border);
+          border-radius: 1.5rem 1.5rem 0 0;
+          padding: 1.5rem 1.5rem 2rem;
+          width: 100%;
+          max-width: 600px;
+          max-height: 92vh;
+          overflow-y: auto;
+          animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+          box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+
+        @media (min-width: 640px) {
+          .modal-overlay {
+            align-items: center;
+            padding: 1rem;
+          }
+          .modal-box {
+            border-radius: 1.25rem;
+            max-height: 85vh;
+          }
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 1.15rem;
+          color: var(--text-main);
+        }
+
+        .modal-close-btn {
+          background: rgba(255,255,255,0.07);
+          border: 1px solid var(--border);
+          border-radius: 50%;
+          width: 38px;
+          height: 38px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.2s;
+          flex-shrink: 0;
+        }
+        .modal-close-btn:hover { background: rgba(239,68,68,0.15); color: var(--danger); border-color: var(--danger); }
+
+        .modal-form-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+
+        @media (min-width: 480px) {
+          .modal-form-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        .modal-actions {
+          display: flex;
+          gap: 0.75rem;
+          margin-top: 1.5rem;
+        }
+
+        .btn-cancel {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
+          padding: 0.75rem 1rem;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          color: var(--text-muted);
+          font-size: 0.95rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-cancel:hover { background: rgba(239,68,68,0.1); color: var(--danger); border-color: var(--danger); }
+
+        .btn-save {
+          flex: 2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
         }
       `}} />
     </div>
