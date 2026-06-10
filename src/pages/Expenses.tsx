@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { Expense, Routine, PaymentMethod } from '../types';
 import { Plus, Trash2, Calendar, DollarSign, Zap, CreditCard, Pencil, X, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -346,7 +347,7 @@ const Expenses = () => {
       </div>
 
       {/* Modal de Edição */}
-      {editingExpense && (
+      {editingExpense && createPortal(
         <div className="modal-overlay" onClick={closeEditModal}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -440,7 +441,8 @@ const Expenses = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `
